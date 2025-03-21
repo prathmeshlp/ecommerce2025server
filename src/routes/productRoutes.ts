@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addReview, createProduct, deleteProduct, getProducts, getReviews, getUniqueCategories, searchProducts, updateProduct } from "../controllers/productController";
+import { addReview, createProduct , getProducts, getReviews, getUniqueCategories, searchProducts, validateDiscount, validateDiscountHandler } from "../controllers/productController";
 const router = Router();
 
 
@@ -9,5 +9,6 @@ router.get("/search", searchProducts);
 router.get("/:productId/reviews", getReviews);
 router.post("/:productId/reviews", addReview);
 router.get("/categories", getUniqueCategories);
+router.post("/validate", validateDiscountHandler);
 
 export default router;

@@ -19,11 +19,11 @@ declare module "express-session" {
 const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   // Check for JWT in Authorization header
   const token = req.header("Authorization")?.replace("Bearer ", "");
-  console.log(token,"token");
+  // console.log(token,"token");
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
-      console.log(decoded,"decoded");
+      // console.log(decoded,"decoded");
       const user = await User.findById(decoded.id);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
       req.user = user;

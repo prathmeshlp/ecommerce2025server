@@ -7,8 +7,6 @@ export const register = async (req: Request, res: Response) => {
   const { email,username, password } = req.body;
   try {
     const user = await User.findOne({ email });
-    console.log(user,"user");
-    console.log(req.body,"req.body");
     if (user) return res.status(400).json({ message: "User already exists" });
     const newUser = new User({ email,username, password });
     await newUser.save();
@@ -40,7 +38,6 @@ export const getUser = async (req: Request, res: Response) => {
 };
 
 export const updateUser = async (req: Request, res: Response) => {
-  console.log(req.user,"req.user")
   const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json(user);
@@ -52,7 +49,7 @@ export const googleAuth = passport.authenticate("google", { scope: ["profile", "
 export const googleAuthCallback = (req: Request, res: Response) => {
   if (req.user) {
     const user = req.user as IUser;
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET!, { expiresIn: "1d" });
     res.redirect(`${process.env.CLIENT_URI}/auth/callback?token=${token}`);
   } else {
     res.status(401).json({ message: "Google authentication failed" });
