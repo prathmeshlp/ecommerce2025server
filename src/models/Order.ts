@@ -1,27 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { IOrder } from "../types/types";
 
-export interface IOrderItem {
-  productId: mongoose.Types.ObjectId;
-  quantity: number;
-  price: number;
-}
 
-export interface IOrder extends Document {
-  userId: mongoose.Types.ObjectId;
-  items: IOrderItem[];
-  total: number;
-  shippingAddress: {
-    street: string;
-    city: string;
-    state: string;
-    zip: string;
-    country: string;
-  };
-  paymentStatus: "pending" | "completed" | "failed";
-  razorpayOrderId?: string;
-  paymentId?: string;
-  createdAt: Date;
-}
 
 const orderSchema: Schema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },

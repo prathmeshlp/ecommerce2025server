@@ -1,22 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { IProduct } from "../types/types";
 
-export interface IReview {
-  userId: mongoose.Types.ObjectId;
-  rating: number;
-  comment: string;
-  createdAt: Date;
-}
 
-export interface IProduct extends Document {
-  name: string;
-  price: number;
-  description: string;
-  image: string;
-  category?: string;
-  reviews: IReview[];
-  stock: number;
-  isDeleted: boolean;
-}
 
 const productSchema: Schema = new Schema(
   {

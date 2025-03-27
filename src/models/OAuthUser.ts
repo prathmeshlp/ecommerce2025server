@@ -1,12 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { OAuthUser } from "../types/types";
 
-export interface OAuthUser extends Document {
-  googleId: string;
-  displayName: string;
-  email: string;
-  photo?: string;
-  refreshToken: string;
-}
 
 const OAUthUserSchema: Schema<OAuthUser> = new Schema(
   {

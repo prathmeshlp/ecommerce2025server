@@ -2,66 +2,124 @@ import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import User, { IUser } from "../models/User";
 import passport from "passport";
+import { asyncHandler, ApiResponse, ApiError } from "../utils/apiUtils";
 
-export const register = async (req: Request, res: Response) => {
-  const { email,username, password } = req.body;
-  try {
-    const user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: "User already exists" });
-    const newUser = new User({ email,username, password });
-    await newUser.save();
-    const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
-    res.status(201).json({ token });
-  } catch (error) {
-    res.status(400).json({ message: "User registration failed", error });
+export const register = asyncHandler(async (req: Request, res: Response) => {
+  const { email, username, password } = req.body;
+
+  // Input validation
+  if (!email || !username || !password) {
+    throw new ApiError(400, "Email, username, and password are required", [], "INVALID_INPUT");
   }
-};
 
-export const login = async (req: Request, res: Response) => {
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    throw new ApiError(400, "User already exists", [], "USER_EXISTS");
+  }
+
+  const newUser = new User({ email, username, password });
+  await newUser.save();
+
+  const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET!, {
+    expiresIn: "1h",
+  });
+
+  res.json(new ApiResponse(201, { token }, "User registered successfully"));
+});
+
+export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  try {
-    const user = await User.findOne({ email });
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
-    res.json({ token });
-  } catch (error) {
-    res.status(500).json({ message: "Login failed", error });
+
+  // Input validation
+  if (!email || !password) {
+    throw new ApiError(400, "Email and password are required", [], "INVALID_INPUT");
   }
-};
 
-export const getUser = async (req: Request, res: Response) => {
-  const user = await User.findById(req.params.id);
-  if (!user) return res.status(404).json({ message: "User not found" });
-  res.json(user);
-};
+  const user = await User.findOne({ email });
+  if (!user || !(await user.comparePassword(password))) {
+    throw new ApiError(401, "Invalid credentials", [], "INVALID_CREDENTIALS");
+  }
 
-export const updateUser = async (req: Request, res: Response) => {
-  const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  if (!user) return res.status(404).json({ message: "User not found" });
-  res.json(user);
-};
+  const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET!, {
+    expiresIn: "7d",
+  });
 
+  res.json(new ApiResponse(200, { token }, "User logged in successfully"));
+});
+
+export const getUser = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  // Input validation
+  if (!id) {
+    throw new ApiError(400, "User ID is required", [], "MISSING_USER_ID");
+  }
+
+  const user = await User.findById(id).select("-password"); // Exclude password
+  if (!user) {
+    throw new ApiError(404, "User not found", [], "USER_NOT_FOUND");
+  }
+
+  res.json(new ApiResponse(200, user, "User retrieved successfully"));
+});
+
+export const updateUser = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  // Input validation
+  if (!id) {
+    throw new ApiError(400, "User ID is required", [], "MISSING_USER_ID");
+  }
+
+  const user = await User.findByIdAndUpdate(id, req.body, {
+    new: true,
+    runValidators: true,
+  }).select("-password"); // Exclude password
+
+  if (!user) {
+    throw new ApiError(404, "User not found", [], "USER_NOT_FOUND");
+  }
+
+  res.json(new ApiResponse(200, user, "User updated successfully"));
+});
 
 export const googleAuth = passport.authenticate("google", { scope: ["profile", "email"] });
 
-export const googleAuthCallback = (req: Request, res: Response) => {
-  if (req.user) {
-    const user = req.user as IUser;
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET!, { expiresIn: "1d" });
-    res.redirect(`${process.env.CLIENT_URI}/auth/callback?token=${token}`);
-  } else {
-    res.status(401).json({ message: "Google authentication failed" });
+export const googleAuthCallback = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, "Google authentication failed", [], "GOOGLE_AUTH_FAILED");
   }
-};
 
-export const logout = (req: Request, res: Response) => {
-  req.logout((err) => {
-    if (err) return res.status(500).json({ message: "Logout failed" });
-    req.session.destroy(() => {
-      res.clearCookie("connect.sid");
-      res.json({ message: "Logged out successfully" });
+  const user = req.user as IUser;
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET!, { expiresIn: "7d" });
+
+  // Redirect with token
+  res.redirect(`${process.env.CLIENT_URI}/auth/callback?token=${token}`);
+});
+
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  // Wrap logout in a Promise for asyncHandler compatibility
+  await new Promise<void>((resolve, reject) => {
+    req.logout((err) => {
+      if (err) {
+        reject(new ApiError(500, "Logout failed", [], "LOGOUT_FAILED"));
+      } else {
+        resolve();
+      }
     });
   });
-};
+
+  // Destroy session and clear cookie
+  await new Promise<void>((resolve, reject) => {
+    req.session.destroy((err) => {
+      if (err) {
+        reject(new ApiError(500, "Session destruction failed", [], "SESSION_DESTROY_FAILED"));
+      } else {
+        res.clearCookie("connect.sid");
+        resolve();
+      }
+    });
+  });
+
+  res.json(new ApiResponse(200, { message: "Logged out successfully" }, "Logged out successfully"));
+});

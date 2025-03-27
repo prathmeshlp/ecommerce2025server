@@ -1,17 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { IDiscount } from "../types/types";
 
-export interface IDiscount extends Document {
-  code: string;
-  description?: string;
-  discountType: "percentage" | "fixed";
-  discountValue: number;
-  minOrderValue?: number;
-  maxDiscountAmount?: number;
-  startDate: Date;
-  endDate?: Date;
-  isActive: boolean;
-  applicableProducts?: string[]; // Array of Product IDs
-}
+
 
 const discountSchema: Schema = new Schema(
   {

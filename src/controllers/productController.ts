@@ -1,67 +1,54 @@
 import { Request, Response } from "express";
 import Product, { IProduct } from "../models/Product";
 import Discount from "../models/Discount";
+import { asyncHandler, ApiResponse, ApiError } from "../utils/apiUtils";
+import { DiscountResponse } from "../types/types";
 
-interface DiscountResponse {
-  success: boolean;
-  discount?: {
-    code: string;
-    discountType: "percentage" | "fixed";
-    discountValue: number;
-    discountAmount: number;
-    newSubtotal: number;
-    discountedItems: { productId: string; discountedPrice: number }[];
-  };
-  error?: string;
-}
 
-export const createProduct = async (req: Request, res: Response) => {
+export const createProduct = asyncHandler(async (req: Request, res: Response) => {
   const { name, price, description, image, category } = req.body;
-  try {
-    const product = new Product({ name, price, description, image, category });
-    await product.save();
-    res.status(201).json(product);
-  } catch (error) {
-    res.status(400).json({ message: "Product creation failed", error });
-  }
-};
 
-export const updateProduct = async (req: Request, res: Response) => {
+  // Input validation
+  if (!name || !price || price < 0) {
+    throw new ApiError(400, "Name and a non-negative price are required", [], "INVALID_INPUT");
+  }
+
+  const product = new Product({ name, price, description, image, category });
+  await product.save();
+
+  res.json(new ApiResponse(201, product, "Product created successfully"));
+});
+
+export const updateProduct = asyncHandler(async (req: Request, res: Response) => {
   const { productId } = req.params;
   const { name, price, image, category, stock } = req.body;
 
-  try {
-    const product = await Product.findByIdAndUpdate(
-      productId,
-      { name, price, image, category, stock },
-      { new: true, runValidators: true }
-    );
-
-    if (!product) return res.status(404).json({ message: "Product not found" });
-
-    res.json(product);
-  } catch (error) {
-    console.error("Error updating product:", error);
-    res.status(500).json({ message: "Server error" });
+  // Input validation
+  if (price !== undefined && price < 0) {
+    throw new ApiError(400, "Price must be non-negative", [], "INVALID_PRICE");
   }
-};
+  if (stock !== undefined && stock < 0) {
+    throw new ApiError(400, "Stock must be non-negative", [], "INVALID_STOCK");
+  }
 
-export const validateDiscount = async (
-  req: Request
-): Promise<DiscountResponse> => {
+  const product = await Product.findByIdAndUpdate(
+    productId,
+    { name, price, image, category, stock },
+    { new: true, runValidators: true }
+  );
+
+  if (!product) {
+    throw new ApiError(404, "Product not found", [], "PRODUCT_NOT_FOUND");
+  }
+
+  res.json(new ApiResponse(200, product, "Product updated successfully"));
+});
+
+export const validateDiscount = async (req: Request): Promise<DiscountResponse> => {
   const { code, productIds, subtotal, items } = req.body;
-  console.log("ValidateDiscount Request:", {
-    code,
-    productIds,
-    subtotal,
-    items,
-  });
-  if (
-    !code ||
-    !productIds ||
-    !Array.isArray(productIds) ||
-    typeof subtotal !== "number"
-  ) {
+
+  // Input validation
+  if (!code || !productIds || !Array.isArray(productIds) || typeof subtotal !== "number") {
     return {
       success: false,
       error: "Code, productIds (array), and subtotal (number) are required.",
@@ -74,207 +61,226 @@ export const validateDiscount = async (
     };
   }
 
-  try {
-    const now = new Date();
-    const discount = await Discount.findOne({
-      code: code.toUpperCase(),
-      isActive: true,
-      startDate: { $lte: now },
-      $or: [{ endDate: { $gte: now } }, { endDate: null }],
-    }).lean();
+  console.log("Input:", { code, productIds, subtotal, items });
 
-    if (!discount) {
-      return { success: false, error: "Invalid or expired discount code." };
-    }
-    console.log(discount);
-    const applicableProductStrings = (discount.applicableProducts || []).map(
-      (id) => (id ? id.toString() : id)
-    );
-    console.log("Applicable Product Strings:", applicableProductStrings);
-    // Filter applicable product IDs based on discount.applicableProducts
-    const applicableProductIds = discount.applicableProducts?.length
-      ? productIds.filter((id) => applicableProductStrings.includes(id))
-      : productIds;
+  const now = new Date();
+  const discount = await Discount.findOne({
+    code: code.toUpperCase(),
+    isActive: true,
+    startDate: { $lte: now },
+    $or: [{ endDate: { $gte: now } }, { endDate: null }],
+  }).lean();
 
-    console.log(applicableProductIds, "applicableProductIds");
+  if (!discount) {
+    return { success: false, error: "Invalid or expired discount code." };
+  }
+  console.log("Discount:", discount);
 
-    if (applicableProductIds.length === 0) {
-      return {
-        success: false,
-        error: "Discount does not apply to any items in your cart.",
-      };
-    }
+  const applicableProductStrings = (discount.applicableProducts || []).map((id) =>
+    id ? id.toString() : id
+  );
+  const applicableProductIds = discount.applicableProducts?.length
+    ? productIds.filter((id) => applicableProductStrings.includes(id))
+    : productIds;
 
-    if (discount.minOrderValue && subtotal < discount.minOrderValue) {
-      return {
-        success: false,
-        error: `Minimum order value of ₹${discount.minOrderValue} required for this discount.`,
-      };
-    }
+  if (applicableProductIds.length === 0) {
+    return {
+      success: false,
+      error: "Discount does not apply to any items in your cart.",
+    };
+  }
 
-    const products = await Product.find({
-      _id: { $in: applicableProductIds },
-    }).lean();
-    if (products.length !== applicableProductIds.length) {
-      return {
-        success: false,
-        error: "Some applicable product IDs are invalid.",
-      };
-    }
+  if (discount.minOrderValue && subtotal < discount.minOrderValue) {
+    return {
+      success: false,
+      error: `Minimum order value of ₹${discount.minOrderValue} required for this discount.`,
+    };
+  }
 
-    const discountedItems = products.map((product) => {
-      let discountedPrice = product.price;
-      if (discount.discountType === "percentage") {
-        discountedPrice = product.price * (1 - discount.discountValue / 100);
-        if (discount.maxDiscountAmount) {
-          discountedPrice = Math.max(
-            product.price - discount.maxDiscountAmount,
-            discountedPrice
-          );
-        }
-      } else if (discount.discountType === "fixed") {
-        discountedPrice = product.price - discount.discountValue;
+  const products = await Product.find({ _id: { $in: applicableProductIds } }).lean();
+  if (products.length !== applicableProductIds.length) {
+    return {
+      success: false,
+      error: "Some applicable product IDs are invalid.",
+    };
+  }
+  console.log("Products:", products);
+
+  const discountedItems = products.map((product) => {
+    const originalPrice = product.price;
+    let discountedPrice = originalPrice;
+    let discountPerItem = 0;
+
+    if (discount.discountType === "percentage") {
+      discountPerItem = originalPrice * (discount.discountValue / 100);
+      discountedPrice = originalPrice - discountPerItem;
+      if (discount.maxDiscountAmount && discountPerItem > discount.maxDiscountAmount) {
+        discountPerItem = discount.maxDiscountAmount;
+        discountedPrice = originalPrice - discountPerItem;
       }
-      return {
-        productId: product._id.toString(),
-        discountedPrice: Math.max(discountedPrice, 0),
-      };
-    });
+    } else if (discount.discountType === "fixed") {
+      discountPerItem = discount.discountValue;
+      discountedPrice = originalPrice - discountPerItem;
+      if (discount.maxDiscountAmount && discountPerItem > discount.maxDiscountAmount) {
+        discountPerItem = discount.maxDiscountAmount;
+        discountedPrice = originalPrice - discountPerItem;
+      }
+    }
 
-    const discountAmount = discountedItems.reduce((sum, item) => {
-      const cartItem = items.find((i: any) => i.productId === item.productId);
-      const itemQuantity = cartItem ? cartItem.quantity : 1;
-      const originalPrice = products.find(
-        (p) => p._id.toString() === item.productId
-      )!.price;
-      return sum + (originalPrice - item.discountedPrice) * itemQuantity;
-    }, 0);
+    // Ensure discounted price is not negative
+    discountedPrice = Math.max(discountedPrice, 0);
+
+    console.log(`Product ${product._id}:`, {
+      originalPrice,
+      discountPerItem,
+      discountedPrice,
+    });
 
     return {
-      success: true,
-      discount: {
-        code: discount.code,
-        discountType: discount.discountType,
-        discountValue: discount.discountValue,
-        discountAmount: Number(discountAmount.toFixed(2)),
-        newSubtotal: Number((subtotal - discountAmount).toFixed(2)),
-        discountedItems,
-      },
+      productId: product._id.toString(),
+      discountedPrice: Number(discountedPrice.toFixed(2)),
     };
-  } catch (error) {
-    console.error("Error validating discount:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    return { success: false, error: "Server error: " + errorMessage };
-  }
+  });
+
+  const discountAmount = discountedItems.reduce((sum, item) => {
+    const cartItem = items.find((i: any) => i.productId === item.productId);
+    const itemQuantity = cartItem ? cartItem.quantity : 1;
+    const originalPrice = products.find((p) => p._id.toString() === item.productId)!.price;
+    const discountPerItem = originalPrice - item.discountedPrice;
+    console.log(`Item ${item.productId}:`, {
+      originalPrice,
+      discountedPrice: item.discountedPrice,
+      discountPerItem,
+      quantity: itemQuantity,
+    });
+    return sum + discountPerItem * itemQuantity;
+  }, 0);
+
+  console.log("Total Discount Amount:", discountAmount);
+
+  return {
+    success: true,
+    discount: {
+      code: discount.code,
+      discountType: discount.discountType,
+      discountValue: discount.discountValue,
+      discountAmount: Number(discountAmount.toFixed(2)),
+      newSubtotal: Number((subtotal - discountAmount).toFixed(2)),
+      discountedItems,
+    },
+  };
 };
 
-export const validateDiscountHandler = async (req: Request, res: Response) => {
+export const validateDiscountHandler = asyncHandler(async (req: Request, res: Response) => {
   const result = await validateDiscount(req);
   if (result.success) {
-    res.status(200).json(result);
+    res.json(new ApiResponse(200, result, "Discount validated successfully"));
   } else {
-    res.status(result.error?.includes("Server error") ? 500 : 400).json(result);
+    throw new ApiError(
+      result.error?.includes("Server error") ? 500 : 400,
+      result.error || "Discount validation failed",
+      [],
+      result.error?.includes("Server error") ? "SERVER_ERROR" : "INVALID_DISCOUNT"
+    );
   }
-};
+});
 
-export const getProducts = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
-  const skip = (page - 1) * limit;
+export const getProducts = asyncHandler(async (req: Request, res: Response) => {
+  const totalProducts = await Product.countDocuments();
+  const products = await Product.find().lean(); // Fetch all products
 
-  try {
-    const totalProducts = await Product.countDocuments();
-    const products = await Product.find().skip(skip).limit(limit).lean();
+  const now = new Date();
+  const activeDiscounts = await Discount.find({
+    isActive: true,
+    startDate: { $lte: now },
+    $or: [{ endDate: { $gte: now } }, { endDate: null }],
+  }).lean();
 
-    const now = new Date();
-    const activeDiscounts = await Discount.find({
-      isActive: true,
-      startDate: { $lte: now },
-      $or: [{ endDate: { $gte: now } }, { endDate: null }],
-    }).lean();
+  const productsWithCoupons = products.map((product) => {
+    const applicableDiscount = activeDiscounts.find(
+      (discount) =>
+        !discount.applicableProducts ||
+        discount.applicableProducts.length === 0 ||
+        discount.applicableProducts.some((p) => p.toString() === product._id.toString())
+    );
+    if (applicableDiscount) {
+      return {
+        ...product,
+        discount: {
+          code: applicableDiscount.code,
+          discountType: applicableDiscount.discountType,
+          discountValue: applicableDiscount.discountValue,
+        },
+      };
+    }
+    return product;
+  });
 
-    const productsWithCoupons = products.map((product) => {
-      const applicableDiscount = activeDiscounts.find(
-        (discount) =>
-          !discount.applicableProducts ||
-          discount.applicableProducts.length === 0 ||
-          discount.applicableProducts.some(
-            (p) => p.toString() === product._id.toString()
-          )
-      );
-      if (applicableDiscount) {
-        return {
-          ...product,
-          discount: {
-            code: applicableDiscount.code,
-            discountType: applicableDiscount.discountType,
-            discountValue: applicableDiscount.discountValue,
-          },
-        };
-      }
-      return product;
-    });
+  const responseData = {
+    products: productsWithCoupons,
+    totalProducts,
+    currentPage: 1, // Default to 1 since no server-side pagination
+    totalPages: 1, // Will be recalculated on frontend
+  };
 
-    res.json({
-      products: productsWithCoupons,
-      totalProducts,
-      currentPage: page,
-      totalPages: Math.ceil(totalProducts / limit),
-    });
-  } catch (error) {
-    console.error("Error fetching products:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
+  res.json(new ApiResponse(200, responseData, "Products retrieved successfully"));
+});
 
-export const deleteProduct = async (req: Request, res: Response) => {
+export const deleteProduct = asyncHandler(async (req: Request, res: Response) => {
   const { productId } = req.params;
 
-  try {
-    const product = await Product.findByIdAndDelete(productId);
-    if (!product) return res.status(404).json({ message: "Product not found" });
-
-    res.json({ message: "Product deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting product:", error);
-    res.status(500).json({ message: "Server error" });
+  const product = await Product.findByIdAndDelete(productId);
+  if (!product) {
+    throw new ApiError(404, "Product not found", [], "PRODUCT_NOT_FOUND");
   }
-};
 
-export const searchProducts = async (req: Request, res: Response) => {
+  res.json(new ApiResponse(200, { message: "Product deleted successfully" }, "Product deleted successfully"));
+});
+
+export const searchProducts = asyncHandler(async (req: Request, res: Response) => {
   const { q } = req.query;
-  try {
-    const products = await Product.find({ $text: { $search: q as string } });
-    res.json(products);
-  } catch (error) {
-    res.status(500).json({ message: "Search failed", error });
+
+  if (!q || typeof q !== "string") {
+    throw new ApiError(400, "Search query (q) is required and must be a string", [], "INVALID_QUERY");
   }
-};
 
-export const getReviews = async (req: Request, res: Response) => {
-  const product = await Product.findById(req.params.productId);
-  if (!product) return res.status(404).json({ message: "Product not found" });
-  res.json(product.reviews);
-};
+  const products = await Product.find({ $text: { $search: q as string } });
 
-export const addReview = async (req: Request, res: Response) => {
+  res.json(new ApiResponse(200, products, "Products search completed successfully"));
+});
+
+export const getReviews = asyncHandler(async (req: Request, res: Response) => {
+  const { productId } = req.params;
+
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ApiError(404, "Product not found", [], "PRODUCT_NOT_FOUND");
+  }
+
+  res.json(new ApiResponse(200, product.reviews, "Reviews retrieved successfully"));
+});
+
+export const addReview = asyncHandler(async (req: Request, res: Response) => {
   const { userId, rating, comment } = req.body;
-  const product = await Product.findById(req.params.productId);
-  if (!product) return res.status(404).json({ message: "Product not found" });
+  const { productId } = req.params;
+
+  // Input validation
+  if (!userId || !rating || rating < 1 || rating > 5) {
+    throw new ApiError(400, "User ID and rating (1-5) are required", [], "INVALID_REVIEW_INPUT");
+  }
+
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ApiError(404, "Product not found", [], "PRODUCT_NOT_FOUND");
+  }
+
   product.reviews.push({ userId, rating, comment, createdAt: new Date() });
   await product.save();
-  res.status(201).json(product.reviews);
-};
 
-export const getUniqueCategories = async (req: Request, res: Response) => {
-  try {
-    const categories = await Product.distinct("category").then((cats) =>
-      cats.filter((cat) => cat)
-    ); // Filter out null/undefined
-    res.json(categories);
-  } catch (error) {
-    console.error("Error fetching categories:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
+  res.json(new ApiResponse(201, product.reviews, "Review added successfully"));
+});
+
+export const getUniqueCategories = asyncHandler(async (req: Request, res: Response) => {
+  const categories = await Product.distinct("category").then((cats) => cats.filter((cat) => cat));
+  res.json(new ApiResponse(200, categories, "Categories retrieved successfully"));
+});

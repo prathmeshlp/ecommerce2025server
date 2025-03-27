@@ -1,13 +1,14 @@
 import { Request, Response, NextFunction } from "express";
-import { IUser } from "../models/User";
-
-
+import { ApiError } from "../utils/apiUtils";
+import { IUser } from "../types/types";
 
 const adminMiddleware = (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user as IUser
+  const user = req.user as IUser;
+
   if (!user || user?.role !== "admin") {
-    return res.status(403).json({ message: "Admin access required" });
+    throw new ApiError(403, "Admin access required", [], "ADMIN_ACCESS_REQUIRED");
   }
+
   next();
 };
 

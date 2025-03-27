@@ -1,25 +1,8 @@
 import mongoose, { Schema, Document } from "mongoose";
 import bcrypt from "bcrypt";
-import { timeStamp } from "console";
+import { IUser } from "../types/types";
 
-export interface IAddress {
-  street: string;
-  city: string;
-  state: string;
-  zip: string;
-  country: string;
-}
 
-export interface IUser extends Document {
-  _id: string;
-  email: string;
-  username: string;
-  password?: string; // Optional for OAuth users
-  role: "user" | "admin";
-  isBanned: boolean;
-  address?: IAddress;
-  comparePassword(candidatePassword: string): Promise<boolean>;
-}
 
 const userSchema: Schema = new Schema(
   {
