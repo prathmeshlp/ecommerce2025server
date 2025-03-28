@@ -4,9 +4,10 @@ import {
   bulkUpdateOrders,
   bulkUpdateProducts,
   createDiscount,
+  createProduct,
   deleteDiscount,
   deleteOrder,
-  deleteUser,
+  deleteProduct,
   deleteUserAdmin,
   getAdminDashboard,
   getDiscounts,
@@ -15,9 +16,10 @@ import {
   getUsersAdmin,
   updateDiscount,
   updateOrder,
+  updateProduct,
   updateUserAdmin,
 } from "../controllers/adminController";
-import { createProduct, deleteProduct, getProducts, updateProduct } from "../controllers/productController";
+import { getProducts } from "../controllers/productController";
 
 const router = express.Router();
 
@@ -27,8 +29,8 @@ router.put("/users/:userId", updateUserAdmin);
 router.delete("/users/:userId", deleteUserAdmin);
 router.get("/products", getProducts);
 router.post("/products", createProduct);
-router.put("/:productId", updateProduct);
-router.delete("/:productId", deleteProduct);
+router.put("/products/:productId", updateProduct);
+router.delete("/products/:productId", deleteProduct);
 router.get("/categories", getUniqueCategories);
 router.get("/orders", getOrders);
 router.put("/orders/:orderId", updateOrder);

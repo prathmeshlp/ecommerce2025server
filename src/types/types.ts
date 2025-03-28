@@ -2,14 +2,14 @@ import mongoose, { Document } from "mongoose";
 
 
 
-// // Extend Express Request type to include user
-// declare global {
-//   namespace Express {
-//     interface Request {
-//       user?: User;
-//     }
-//   }
-// }
+// Extend Express Request type to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User;
+    }
+  }
+}
 
 // Extend express-session to include passport user
 declare module "express-session" {
@@ -128,7 +128,7 @@ export interface IReview {
 export interface IProduct extends Document {
   name: string;
   price: number;
-  description: string;
+  description?: string;
   image: string;
   category?: string;
   reviews: IReview[];

@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import User, { IUser } from "../models/User";
+import User from "../models/User";
 import passport from "passport";
 import { asyncHandler, ApiResponse, ApiError } from "../utils/apiUtils";
+import { IUser } from "../types/types";
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const { email, username, password } = req.body;

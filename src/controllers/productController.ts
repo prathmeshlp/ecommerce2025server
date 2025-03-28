@@ -1,48 +1,13 @@
 import { Request, Response } from "express";
-import Product, { IProduct } from "../models/Product";
+import Product from "../models/Product";
 import Discount from "../models/Discount";
 import { asyncHandler, ApiResponse, ApiError } from "../utils/apiUtils";
 import { DiscountResponse } from "../types/types";
+import mongoose from "mongoose";
 
 
-export const createProduct = asyncHandler(async (req: Request, res: Response) => {
-  const { name, price, description, image, category } = req.body;
 
-  // Input validation
-  if (!name || !price || price < 0) {
-    throw new ApiError(400, "Name and a non-negative price are required", [], "INVALID_INPUT");
-  }
 
-  const product = new Product({ name, price, description, image, category });
-  await product.save();
-
-  res.json(new ApiResponse(201, product, "Product created successfully"));
-});
-
-export const updateProduct = asyncHandler(async (req: Request, res: Response) => {
-  const { productId } = req.params;
-  const { name, price, image, category, stock } = req.body;
-
-  // Input validation
-  if (price !== undefined && price < 0) {
-    throw new ApiError(400, "Price must be non-negative", [], "INVALID_PRICE");
-  }
-  if (stock !== undefined && stock < 0) {
-    throw new ApiError(400, "Stock must be non-negative", [], "INVALID_STOCK");
-  }
-
-  const product = await Product.findByIdAndUpdate(
-    productId,
-    { name, price, image, category, stock },
-    { new: true, runValidators: true }
-  );
-
-  if (!product) {
-    throw new ApiError(404, "Product not found", [], "PRODUCT_NOT_FOUND");
-  }
-
-  res.json(new ApiResponse(200, product, "Product updated successfully"));
-});
 
 export const validateDiscount = async (req: Request): Promise<DiscountResponse> => {
   const { code, productIds, subtotal, items } = req.body;
@@ -185,10 +150,43 @@ export const validateDiscountHandler = asyncHandler(async (req: Request, res: Re
   }
 });
 
-export const getProducts = asyncHandler(async (req: Request, res: Response) => {
-  const totalProducts = await Product.countDocuments();
-  const products = await Product.find().lean(); // Fetch all products
 
+
+export const getProducts = asyncHandler(async (req: Request, res: Response) => {
+  // Aggregation pipeline to calculate avgRating and fetch products
+  const productPipeline: mongoose.PipelineStage[] = [
+    // Match only non-deleted products (optional, based on your needs)
+    { $match: { isDeleted: false } },
+    
+    // Calculate avgRating from reviews
+    {
+      $project: {
+        name: 1,
+        price: 1,
+        description: 1,
+        image: 1,
+        category: 1,
+        stock: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        avgRating: {
+          $cond: {
+            if: { $eq: [{ $size: "$reviews" }, 0] },
+            then: 0, // Default to 0 if no reviews
+            else: { $avg: "$reviews.rating" }, // Average of review ratings
+          },
+        },
+      },
+    },
+  ];
+
+  // Fetch products with avgRating
+  const products = await Product.aggregate(productPipeline);
+
+  // Get total count of products
+  const totalProducts = await Product.countDocuments({ isDeleted: false });
+
+  // Fetch active discounts
   const now = new Date();
   const activeDiscounts = await Discount.find({
     isActive: true,
@@ -196,6 +194,7 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
     $or: [{ endDate: { $gte: now } }, { endDate: null }],
   }).lean();
 
+  // Map products with applicable discounts
   const productsWithCoupons = products.map((product) => {
     const applicableDiscount = activeDiscounts.find(
       (discount) =>
@@ -226,16 +225,6 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   res.json(new ApiResponse(200, responseData, "Products retrieved successfully"));
 });
 
-export const deleteProduct = asyncHandler(async (req: Request, res: Response) => {
-  const { productId } = req.params;
-
-  const product = await Product.findByIdAndDelete(productId);
-  if (!product) {
-    throw new ApiError(404, "Product not found", [], "PRODUCT_NOT_FOUND");
-  }
-
-  res.json(new ApiResponse(200, { message: "Product deleted successfully" }, "Product deleted successfully"));
-});
 
 export const searchProducts = asyncHandler(async (req: Request, res: Response) => {
   const { q } = req.query;

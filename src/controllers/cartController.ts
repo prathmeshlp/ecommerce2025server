@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import Cart, { ICart } from "../models/Cart";
+import Cart from "../models/Cart";
 import { asyncHandler, ApiResponse, ApiError } from "../utils/apiUtils";
 
 export const addToCart = asyncHandler(async (req: Request, res: Response) => {
