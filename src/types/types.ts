@@ -78,9 +78,8 @@ export interface DiscountResponse {
     code: string;
     discountType: "percentage" | "fixed";
     discountValue: number;
-    discountAmount: number;
-    newSubtotal: number;
     discountedItems: { productId: string; discountedPrice: number }[];
+    maxDiscountAmount?: number;
   };
   error?: string;
 }

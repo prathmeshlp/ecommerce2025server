@@ -22,7 +22,7 @@ export const validateDiscount = async (req: Request): Promise<DiscountResponse> 
   if (!items || !Array.isArray(items)) {
     return {
       success: false,
-      error: "Items array is required for quantity calculation.",
+      error: "Items array is required for quantity validation.",
     };
   }
 
@@ -95,11 +95,7 @@ export const validateDiscount = async (req: Request): Promise<DiscountResponse> 
     // Ensure discounted price is not negative
     discountedPrice = Math.max(discountedPrice, 0);
 
-    console.log(`Product ${product._id}:`, {
-      originalPrice,
-      discountPerItem,
-      discountedPrice,
-    });
+    console.log(`Product ${product._id}:`, { originalPrice, discountPerItem, discountedPrice });
 
     return {
       productId: product._id.toString(),
@@ -107,31 +103,14 @@ export const validateDiscount = async (req: Request): Promise<DiscountResponse> 
     };
   });
 
-  const discountAmount = discountedItems.reduce((sum, item) => {
-    const cartItem = items.find((i: any) => i.productId === item.productId);
-    const itemQuantity = cartItem ? cartItem.quantity : 1;
-    const originalPrice = products.find((p) => p._id.toString() === item.productId)!.price;
-    const discountPerItem = originalPrice - item.discountedPrice;
-    console.log(`Item ${item.productId}:`, {
-      originalPrice,
-      discountedPrice: item.discountedPrice,
-      discountPerItem,
-      quantity: itemQuantity,
-    });
-    return sum + discountPerItem * itemQuantity;
-  }, 0);
-
-  console.log("Total Discount Amount:", discountAmount);
-
   return {
     success: true,
     discount: {
       code: discount.code,
       discountType: discount.discountType,
       discountValue: discount.discountValue,
-      discountAmount: Number(discountAmount.toFixed(2)),
-      newSubtotal: Number((subtotal - discountAmount).toFixed(2)),
       discountedItems,
+      maxDiscountAmount: discount.maxDiscountAmount,
     },
   };
 };
@@ -149,7 +128,6 @@ export const validateDiscountHandler = asyncHandler(async (req: Request, res: Re
     );
   }
 });
-
 
 
 export const getProducts = asyncHandler(async (req: Request, res: Response) => {
