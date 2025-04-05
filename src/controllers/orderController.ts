@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import dotenv from "dotenv";
-dotenv.config();
+// import dotenv from "dotenv";
+// dotenv.config();
 import Razorpay from "razorpay";
 import Order from "../models/Order";
 import crypto from "crypto";

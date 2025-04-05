@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+dotenv.config();
 import Product from "./models/Product";
 import cloudinary from "./config/cloudinary";
 import path from "path";
 import fs from "fs";
 
-dotenv.config();
 
 interface ProductData {
   name: string;

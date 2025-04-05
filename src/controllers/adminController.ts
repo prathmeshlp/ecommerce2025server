@@ -168,7 +168,6 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
 export const createProduct = asyncHandler(
   async (req: Request, res: Response) => {
     const { name, price, stock, image, category, description } = req.body;
-    console.log(req.body);
     // Input validation
     if (!name || !price || price < 0 || !description) {
       throw new ApiError(

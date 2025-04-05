@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import dotenv from "dotenv";
-dotenv.config();
+// import dotenv from "dotenv";
+// dotenv.config();
 import logger from "./logger";
 import crypto from "crypto";
 

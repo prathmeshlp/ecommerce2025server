@@ -6,9 +6,6 @@ import { DiscountResponse } from "../types/types";
 import mongoose from "mongoose";
 
 
-
-
-
 export const validateDiscount = async (req: Request): Promise<DiscountResponse> => {
   const { code, productIds, subtotal, items } = req.body;
 
@@ -26,7 +23,6 @@ export const validateDiscount = async (req: Request): Promise<DiscountResponse> 
     };
   }
 
-  console.log("Input:", { code, productIds, subtotal, items });
 
   const now = new Date();
   const discount = await Discount.findOne({
@@ -39,7 +35,6 @@ export const validateDiscount = async (req: Request): Promise<DiscountResponse> 
   if (!discount) {
     return { success: false, error: "Invalid or expired discount code." };
   }
-  console.log("Discount:", discount);
 
   const applicableProductStrings = (discount.applicableProducts || []).map((id) =>
     id ? id.toString() : id
@@ -69,7 +64,6 @@ export const validateDiscount = async (req: Request): Promise<DiscountResponse> 
       error: "Some applicable product IDs are invalid.",
     };
   }
-  console.log("Products:", products);
 
   const discountedItems = products.map((product) => {
     const originalPrice = product.price;
@@ -95,7 +89,6 @@ export const validateDiscount = async (req: Request): Promise<DiscountResponse> 
     // Ensure discounted price is not negative
     discountedPrice = Math.max(discountedPrice, 0);
 
-    console.log(`Product ${product._id}:`, { originalPrice, discountPerItem, discountedPrice });
 
     return {
       productId: product._id.toString(),
