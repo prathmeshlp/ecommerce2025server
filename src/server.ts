@@ -13,7 +13,7 @@ import logger from "./utils/logger";
 import { loggerMiddleware } from "./middleware/loggerMiddleware";
 import { errorHandler } from "./middleware/errorHandler";
 import routes from "./routes";
-import mongoose from "mongoose"; // Assuming Mongoose
+import mongoose from "mongoose"; 
 
 const app: Express = express();
 
@@ -86,5 +86,9 @@ const startServer = async () => {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 };
+
+app.get("/", (req, res) => {
+  res.json({ message: "Hello from server!" });
+});
 
 startServer();
