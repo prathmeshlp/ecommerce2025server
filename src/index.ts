@@ -88,7 +88,7 @@ const startServer = async () => {
 };
 
 app.get("/", (req, res) => {
-  res.json({ message: "Hello from server!" });
+  res.send("Ecommerce2025 Server is running!");
 });
 
 startServer();
