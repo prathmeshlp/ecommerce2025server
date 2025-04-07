@@ -20,10 +20,10 @@ console.log(process.env.NODE_ENV); // Log the current environment
 const app: Express = express();
 
 // Environment variables with fallbacks
-const PORT = process.env.PORT || 5000;
-const CLIENT_URI = process.env.CLIENT_URI || "https://ecommerce2025client.vercel.app";
-const SESSION_SECRET = process.env.SESSION_SECRET || "default-secret";
-const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/myapp";
+const PORT = process.env.PORT;
+const CLIENT_URI = process.env.CLIENT_URI;
+const SESSION_SECRET = process.env.SESSION_SECRET!; 
+const MONGO_URI = process.env.MONGO_URI;
 
 // Middleware setup (shared for both envs)
 app.use(cors({ origin: CLIENT_URI, credentials: true }));
