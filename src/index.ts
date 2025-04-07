@@ -1,4 +1,4 @@
-import express, { Express } from "express";
+import express, { Express, Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 dotenv.config();
 import cors from "cors";
@@ -14,22 +14,36 @@ import { loggerMiddleware } from "./middleware/loggerMiddleware";
 import { errorHandler } from "./middleware/errorHandler";
 import routes from "./routes";
 import mongoose from "mongoose";
+import serverless from "serverless-http";
 
 // Create Express app
 const app: Express = express();
 
-// Load environment variables
-const PORT = process.env.PORT || 5000;
-const CLIENT_URI = process.env.CLIENT_URI;
-const SESSION_SECRET = process.env.SESSION_SECRET!;
-const MONGO_URI = process.env.MONGO_URI!;
+// Validate environment variables
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5000;
+const CLIENT_URI = process.env.CLIENT_URI || "http://localhost:5173";
+const SESSION_SECRET = process.env.SESSION_SECRET;
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!SESSION_SECRET || !MONGO_URI) {
+  logger.error("Missing required environment variables");
+  process.exit(1);
+}
 
 // Middleware
-app.use(cors({ origin: CLIENT_URI, credentials: true }));
+app.use(cors({ 
+  origin: CLIENT_URI, 
+  credentials: true 
+}));
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: { defaultSrc: ["'self'"] },
+      directives: { 
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"]
+      },
     },
   })
 );
@@ -43,27 +57,52 @@ app.use(
 );
 app.use(express.json({ limit: "10kb" }));
 
+// Session configuration
 app.use(
   session({
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: MONGO_URI }),
+    store: MongoStore.create({ 
+      mongoUrl: MONGO_URI,
+      ttl: 14 * 24 * 60 * 60 // 14 days
+    }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 1000 * 60 * 60 * 24,
     },
   })
 );
 
 app.use(passport.initialize());
+app.use(passport.session());
 app.use(loggerMiddleware);
 
+// Health check endpoint
+app.get("/health", (req: Request, res: Response) => {
+  res.status(200).json({ status: "healthy" });
+});
+
 // Routes
-app.get("/", (req, res) => {
+app.get("/", (req: Request, res: Response) => {
   res.send("Ecommerce2025 Server is running!");
 });
+
 app.use("/api", routes);
+
+// Handle 404
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.status(404).json({
+    success: false,
+    message: "Not Found",
+    error: {
+      code: 404,
+      message: "The requested resource was not found"
+    }
+  });
+});
 
 // Error handler
 app.use(errorHandler);
@@ -81,14 +120,20 @@ const ensureDBConnection = async () => {
   }
 };
 
-// Vercel-compatible handler
-const serverless = require("serverless-http");
+// Server configuration
 let serverlessHandler: any;
 
 if (process.env.NODE_ENV === "production") {
-  // Prepare for serverless handler (only once)
-   ensureDBConnection();
-  serverlessHandler = serverless(app);
+  // Prepare for serverless handler
+  (async () => {
+    try {
+      await ensureDBConnection();
+      serverlessHandler = serverless(app);
+      logger.info("Serverless handler ready");
+    } catch (err) {
+      logger.error("Serverless initialization failed", err);
+    }
+  })();
 }
 
 if (process.env.NODE_ENV !== "production") {
@@ -107,4 +152,5 @@ if (process.env.NODE_ENV !== "production") {
   startServer();
 }
 
-export default process.env.NODE_ENV === "production" ? serverlessHandler : undefined;
+export { app };
+export default process.env.NODE_ENV === "production" ? serverlessHandler : app;
