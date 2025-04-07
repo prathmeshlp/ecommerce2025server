@@ -21,7 +21,7 @@ const app: Express = express();
 
 // Environment variables with fallbacks
 const PORT = process.env.PORT || 5000;
-const CLIENT_URI = process.env.CLIENT_URI || "http://localhost:5173";
+const CLIENT_URI = process.env.CLIENT_URI || "https://ecommerce2025client.vercel.app";
 const SESSION_SECRET = process.env.SESSION_SECRET || "default-secret";
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/myapp";
 
@@ -59,79 +59,79 @@ app.use("/api", routes);
 app.use(errorHandler);
 
 // Database connection function (reusable for both envs)
-// const ensureDBConnection = async () => {
-//   if (mongoose.connection.readyState === 0) { // Not connected
-//     const retryConnectDB = async (retries = 5, delay = 5000) => {
-//       for (let i = 0; i < retries; i++) {
-//         try {
-//           await connectDB();
-//           logger.info("Database connected successfully");
-//           return;
-//         } catch (err) {
-//           logger.error(`DB connection attempt ${i + 1} failed`, err);
-//           if (i === retries - 1) throw err;
-//           await new Promise((resolve) => setTimeout(resolve, delay));
-//         }
-//       }
-//     };
-//     await retryConnectDB();
-//   }
-// };
+const ensureDBConnection = async () => {
+  if (mongoose.connection.readyState === 0) { // Not connected
+    const retryConnectDB = async (retries = 5, delay = 5000) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          await connectDB();
+          logger.info("Database connected successfully");
+          return;
+        } catch (err) {
+          logger.error(`DB connection attempt ${i + 1} failed`, err);
+          if (i === retries - 1) throw err;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    };
+    await retryConnectDB();
+  }
+};
 
-// // Handler for Vercel (production) - defined at top level
-// const handler = async (req: any, res: any) => {
-//   try {
-//     await ensureDBConnection();
-//     app(req, res); // Handle request with Express
-//   } catch (err) {
-//     logger.error("Request handling failed", err);
-//     res.status(500).send("Internal Server Error");
-//   }
-// };
+// Handler for Vercel (production) - defined at top level
+const handler = async (req: any, res: any) => {
+  try {
+    await ensureDBConnection();
+    app(req, res); // Handle request with Express
+  } catch (err) {
+    logger.error("Request handling failed", err);
+    res.status(500).send("Internal Server Error");
+  }
+};
 
-// // Development: Start traditional server
-// if (process.env.NODE_ENV !== "production") {
-//   const startServer = async () => {
-//     try {
-//       await ensureDBConnection();
-//       const server = app.listen(PORT, () => {
-//         logger.info(`Server running on port ${PORT}`);
-//       });
+// Development: Start traditional server
+if (process.env.NODE_ENV !== "production") {
+  const startServer = async () => {
+    try {
+      await ensureDBConnection();
+      const server = app.listen(PORT, () => {
+        logger.info(`Server running on port ${PORT}`);
+      });
 
-//       const shutdown = async () => {
-//         logger.info("Shutting down server...");
-//         server.close(async () => {
-//           logger.info("Server closed");
-//           try {
-//             await mongoose.connection.close();
-//             logger.info("Database connection closed");
-//           } catch (err) {
-//             logger.error("Error closing database", err);
-//           }
-//           process.exit(0);
-//         });
-//       };
+      const shutdown = async () => {
+        logger.info("Shutting down server...");
+        server.close(async () => {
+          logger.info("Server closed");
+          try {
+            await mongoose.connection.close();
+            logger.info("Database connection closed");
+          } catch (err) {
+            logger.error("Error closing database", err);
+          }
+          process.exit(0);
+        });
+      };
 
-//       process.on("SIGTERM", shutdown);
-//       process.on("SIGINT", shutdown);
-//     } catch (err) {
-//       logger.error("Server startup failed", err);
-//       process.exit(1);
-//     }
-//   };
+      process.on("SIGTERM", shutdown);
+      process.on("SIGINT", shutdown);
+    } catch (err) {
+      logger.error("Server startup failed", err);
+      process.exit(1);
+    }
+  };
 
-//   startServer();
-// }
+  startServer();
+}
 
-// // Export handler for Vercel (production) - at top level
-// export default process.env.NODE_ENV === "production" ? handler : undefined;
+// Export handler for Vercel (production) - at top level
+export default process.env.NODE_ENV === "production" ? handler : undefined;
 
-mongoose
-  .connect(process.env.MONGO_URI!)
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+// mongoose
+//   .connect(process.env.MONGO_URI!)
+//   .then(() => console.log("Connected to MongoDB"))
+//   .catch((err) => console.error("MongoDB connection error:", err));
 
-// const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// // const PORT = process.env.PORT || 5000;
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
