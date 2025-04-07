@@ -1,4 +1,6 @@
 import express, { Express } from "express";
+import dotenv from "dotenv";
+dotenv.config(); 
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -13,10 +15,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import routes from "./routes";
 import mongoose from "mongoose";
 
-// Load .env only in development
-if (process.env.NODE_ENV !== "production") {
-  import("dotenv").then((dotenv) => dotenv.config());
-}
+
 
 const app: Express = express();
 
