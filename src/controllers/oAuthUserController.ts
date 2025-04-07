@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
-// import dotenv from "dotenv";
-// dotenv.config();
+import dotenv from "dotenv";
+dotenv.config();
 import passport from "passport";
 import { asyncHandler, ApiResponse, ApiError } from "../utils/apiUtils";
 
