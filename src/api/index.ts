@@ -1,4 +1,4 @@
-import express, { Express, Request, Response, NextFunction } from "express";
+import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 dotenv.config();
 import cors from "cors";
@@ -7,12 +7,12 @@ import compression from "compression";
 import rateLimit from "express-rate-limit";
 import session from "express-session";
 import MongoStore from "connect-mongo";
-import passport from "./config/passport";
-import connectDB from "./config/db";
-import logger from "./utils/logger";
-import { loggerMiddleware } from "./middleware/loggerMiddleware";
-import { errorHandler } from "./middleware/errorHandler";
-import routes from "./routes";
+import passport from "../config/passport";
+import connectDB from "../config/db";
+import logger from "../utils/logger";
+import { loggerMiddleware } from "../middleware/loggerMiddleware";
+import { errorHandler } from "../middleware/errorHandler";
+import routes from "../routes";
 import mongoose from "mongoose";
 import serverless from "serverless-http";
 
@@ -92,17 +92,7 @@ app.get("/", (req: Request, res: Response) => {
 
 app.use("/api", routes);
 
-// Handle 404
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.status(404).json({
-    success: false,
-    message: "Not Found",
-    error: {
-      code: 404,
-      message: "The requested resource was not found"
-    }
-  });
-});
+
 
 // Error handler
 app.use(errorHandler);
