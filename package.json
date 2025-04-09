@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/api/index.js",
-    "dev": "nodemon dist/api/index.js",
+    "start": "node dist/index.js",
+    "dev": "nodemon dist/index.js",
     "postinstall": "npm run build",
     "seed": "ts-node src/seed.ts",
     "seed-new": "ts-node src/seedNewProducts.ts",

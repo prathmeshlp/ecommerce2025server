@@ -7,12 +7,12 @@ import compression from "compression";
 import rateLimit from "express-rate-limit";
 import session from "express-session";
 import MongoStore from "connect-mongo";
-import passport from "../config/passport";
-import connectDB from "../config/db";
-import logger from "../utils/logger";
-import { loggerMiddleware } from "../middleware/loggerMiddleware";
-import { errorHandler } from "../middleware/errorHandler";
-import routes from "../routes";
+import passport from "./config/passport";
+import connectDB from "./config/db";
+import logger from "./utils/logger";
+import { loggerMiddleware } from "./middleware/loggerMiddleware";
+import { errorHandler } from "./middleware/errorHandler";
+import routes from "./routes";
 import mongoose from "mongoose";
 import serverless from "serverless-http";
 
@@ -31,18 +31,20 @@ if (!SESSION_SECRET || !MONGO_URI) {
 }
 
 // Middleware
-app.use(cors({ 
-  origin: CLIENT_URI, 
-  credentials: true 
-}));
+app.use(
+  cors({
+    origin: CLIENT_URI,
+    credentials: true,
+  })
+);
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: { 
+      directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:"]
+        imgSrc: ["'self'", "data:"],
       },
     },
   })
@@ -63,9 +65,9 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
+    store: MongoStore.create({
       mongoUrl: MONGO_URI,
-      ttl: 14 * 24 * 60 * 60 // 14 days
+      ttl: 14 * 24 * 60 * 60, // 14 days
     }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
@@ -91,8 +93,6 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.use("/api", routes);
-
-
 
 // Error handler
 app.use(errorHandler);

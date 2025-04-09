@@ -1,7 +1,5 @@
 import mongoose, { Document } from "mongoose";
 
-
-
 // Extend Express Request type to include user
 declare global {
   namespace Express {
