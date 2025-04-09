@@ -5,7 +5,7 @@
   "main": "dist/api/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node --es-module-specifier-resolution=node dist/index.js",
+    "start": "node dist/api/index.js",
     "dev": "nodemon dist/api/index.js",
     "seed": "ts-node src/seed.ts",
     "seed-new": "ts-node src/seedNewProducts.ts",
