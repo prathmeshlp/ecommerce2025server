@@ -2,11 +2,12 @@
   "name": "ecommerceserver",
   "version": "1.0.0",
   "description": "E-commerce server application",
-  "main": "dist/api/index.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/api/index.js",
     "dev": "nodemon dist/api/index.js",
+    "postinstall": "npm run build",
     "seed": "ts-node src/seed.ts",
     "seed-new": "ts-node src/seedNewProducts.ts",
     "deploy": "vercel"
